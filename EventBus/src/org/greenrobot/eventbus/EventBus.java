@@ -36,6 +36,8 @@ import java.util.concurrent.ExecutorService;
  * {@link Subscribe}, must be public, return nothing (void), and have exactly one parameter
  * (the event).
  *
+ * handler method必须有{@link Subscribe}注释, 公共方法, 返回void并且只包含一个参数
+ *
  * @author Markus Junginger, greenrobot
  */
 public class EventBus {
@@ -59,9 +61,13 @@ public class EventBus {
         }
     };
 
+    // 负责在主线程分发事件
     private final HandlerPoster mainThreadPoster;
+    // 负责在后台线程分发事件
     private final BackgroundPoster backgroundPoster;
+    // 负责在后台线程发布事件
     private final AsyncPoster asyncPoster;
+    // 负责查找订阅事件的方法
     private final SubscriberMethodFinder subscriberMethodFinder;
     private final ExecutorService executorService;
 
@@ -75,6 +81,8 @@ public class EventBus {
     private final int indexCount;
 
     /** Convenience singleton for apps using a process-wide EventBus instance. */
+    // 延迟初始化, 有利于提高性能
+    // 双重检查模式确保不会重复初始化
     public static EventBus getDefault() {
         if (defaultInstance == null) {
             synchronized (EventBus.class) {
@@ -132,9 +140,11 @@ public class EventBus {
      * ThreadMode} and priority.
      */
     public void register(Object subscriber) {
+        // 查找注册类中被注释的方法
         Class<?> subscriberClass = subscriber.getClass();
         List<SubscriberMethod> subscriberMethods = subscriberMethodFinder.findSubscriberMethods(subscriberClass);
         synchronized (this) {
+            // 逐个订阅
             for (SubscriberMethod subscriberMethod : subscriberMethods) {
                 subscribe(subscriber, subscriberMethod);
             }
