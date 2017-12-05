@@ -39,6 +39,7 @@ class SubscriberMethodFinder {
     private static final Map<Class<?>, List<SubscriberMethod>> METHOD_CACHE = new ConcurrentHashMap<>();
 
     private List<SubscriberInfoIndex> subscriberInfoIndexes;
+    // 当被注释的方法不符合条件(修饰词, 参数数目)的时候是否抛出异常, true表示会抛出异常
     private final boolean strictMethodVerification;
     private final boolean ignoreGeneratedIndex;
 
@@ -53,6 +54,7 @@ class SubscriberMethodFinder {
     }
 
     List<SubscriberMethod> findSubscriberMethods(Class<?> subscriberClass) {
+        // 从缓存中取
         List<SubscriberMethod> subscriberMethods = METHOD_CACHE.get(subscriberClass);
         if (subscriberMethods != null) {
             return subscriberMethods;
@@ -160,10 +162,13 @@ class SubscriberMethodFinder {
         for (Method method : methods) {
             int modifiers = method.getModifiers();
             if ((modifiers & Modifier.PUBLIC) != 0 && (modifiers & MODIFIERS_IGNORE) == 0) {
+                // 进取特定的方法, 公共方法, 且不具有指定的修饰词
                 Class<?>[] parameterTypes = method.getParameterTypes();
                 if (parameterTypes.length == 1) {
+                    // 只能具有一个参数
                     Subscribe subscribeAnnotation = method.getAnnotation(Subscribe.class);
                     if (subscribeAnnotation != null) {
+                        // 必须被注释
                         Class<?> eventType = parameterTypes[0];
                         if (findState.checkAdd(method, eventType)) {
                             ThreadMode threadMode = subscribeAnnotation.threadMode();
@@ -172,11 +177,13 @@ class SubscriberMethodFinder {
                         }
                     }
                 } else if (strictMethodVerification && method.isAnnotationPresent(Subscribe.class)) {
+                    // 如果是严格模式, 就会抛出异常
                     String methodName = method.getDeclaringClass().getName() + "." + method.getName();
                     throw new EventBusException("@Subscribe method " + methodName +
                             "must have exactly 1 parameter but has " + parameterTypes.length);
                 }
             } else if (strictMethodVerification && method.isAnnotationPresent(Subscribe.class)) {
+                // 如果是严格模式, 就会抛出异常
                 String methodName = method.getDeclaringClass().getName() + "." + method.getName();
                 throw new EventBusException(methodName +
                         " is a illegal @Subscribe method: must be public, non-static, and non-abstract");
@@ -229,6 +236,7 @@ class SubscriberMethodFinder {
                         throw new IllegalStateException();
                     }
                     // Put any non-Method object to "consume" the existing Method
+                    // 为了弹出一开始放进去的Method
                     anyMethodByEventType.put(eventType, this);
                 }
                 return checkAddWithMethodSignature(method, eventType);
@@ -236,11 +244,15 @@ class SubscriberMethodFinder {
         }
 
         private boolean checkAddWithMethodSignature(Method method, Class<?> eventType) {
+            // 重复使用StringBuilder来构建固定的名称
             methodKeyBuilder.setLength(0);
+            // 方法名
             methodKeyBuilder.append(method.getName());
+            // 参数类名
             methodKeyBuilder.append('>').append(eventType.getName());
 
             String methodKey = methodKeyBuilder.toString();
+            // 最近的定义该方法的类, 如果被重写的方法没有注释, 会被识别到吗?
             Class<?> methodClass = method.getDeclaringClass();
             Class<?> methodClassOld = subscriberClassByMethodKey.put(methodKey, methodClass);
             if (methodClassOld == null || methodClassOld.isAssignableFrom(methodClass)) {
