@@ -50,7 +50,9 @@ public class EventBus {
     private static final EventBusBuilder DEFAULT_BUILDER = new EventBusBuilder();
     private static final Map<Class<?>, List<Class<?>>> eventTypesCache = new HashMap<>();
 
+    // 保存了所有
     private final Map<Class<?>, CopyOnWriteArrayList<Subscription>> subscriptionsByEventType;
+    // 保存了所有实例订阅的所有事件类
     private final Map<Object, List<Class<?>>> typesBySubscriber;
     private final Map<Class<?>, Object> stickyEvents;
 
@@ -142,6 +144,7 @@ public class EventBus {
     public void register(Object subscriber) {
         // 查找注册类中被注释的方法
         Class<?> subscriberClass = subscriber.getClass();
+        // 获取这个实例中订阅了事件的方法列表
         List<SubscriberMethod> subscriberMethods = subscriberMethodFinder.findSubscriberMethods(subscriberClass);
         synchronized (this) {
             // 逐个订阅
@@ -154,9 +157,12 @@ public class EventBus {
     // Must be called in synchronized block
     private void subscribe(Object subscriber, SubscriberMethod subscriberMethod) {
         Class<?> eventType = subscriberMethod.eventType;
+        // Subscription关联具体的实例和方法列表, 因为方法列表本身关联的是类, 不是具体某个实例
         Subscription newSubscription = new Subscription(subscriber, subscriberMethod);
+        // 订阅了某个事件类的所有Subscription
         CopyOnWriteArrayList<Subscription> subscriptions = subscriptionsByEventType.get(eventType);
         if (subscriptions == null) {
+            // 还没这个事件的容器, 则创建
             subscriptions = new CopyOnWriteArrayList<>();
             subscriptionsByEventType.put(eventType, subscriptions);
         } else {
@@ -165,15 +171,16 @@ public class EventBus {
                         + eventType);
             }
         }
-
+        // 遍历列表, 并根据优先级插入到合适的位置
         int size = subscriptions.size();
         for (int i = 0; i <= size; i++) {
+            // i == size避免了抛出异常, 默认放到列表最后, 如果priority相同是放到相同的item的后面
             if (i == size || subscriberMethod.priority > subscriptions.get(i).subscriberMethod.priority) {
                 subscriptions.add(i, newSubscription);
                 break;
             }
         }
-
+        // 获取某个实例订阅的所有事件类的集合
         List<Class<?>> subscribedEvents = typesBySubscriber.get(subscriber);
         if (subscribedEvents == null) {
             subscribedEvents = new ArrayList<>();
